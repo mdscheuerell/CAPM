@@ -11,6 +11,7 @@ output:
     toc: yes
     toc_depth: '3'
 bibliography: capm.bib
+csl: JApplEcol.csl
 ---
 
 ```{r set_options, echo=FALSE, cache=FALSE}
@@ -32,8 +33,8 @@ This is version `r paste0('0.',format(Sys.time(), '%y.%m.%d'))`.
 
 In finance, there are two general forms of risk with respect to markets and investments. Systematic, or aggregate, risk refers to vulnerability to large-scale events or outcomes that affect entire markets [e.g., government policy, terrorist attacks, natural disasters; @sharpe64; @lintner65]. Unsystematic, or asset, risk is specific to particular securities or industries [e.g., droughts may affect some commodities like wheat or corn with no effect on oil; @sharpe64, @fama68]. Portfolio diversification will reduce unsystematic risk, but it will not affect systematic risk. Thus, one should have a good understanding of an asset’s systematic risk before it is priced or considered for addition to a portfolio [@sharpe64, @beja72].
 
-Capital Asset Pricing Model (CAPM)
+### Capital Asset Pricing Model (CAPM)
 
-Sharpe’s [-@sharpe63] seminal work on portfolio theory outlined what he called “the diagonal model,” whereby returns of various assets are related through a combination of random factors and a common underlying influence. In other words, the total variance in returns of a particular asset is a combination of the variance in larger market returns (i.e., systematic risk) plus residual variance uncorrelated with the asset [i.e., unsystematic risk, @sharpe64]. This work, combined with that of others (e.g., Treynor 1962; Lintner 1965), led to the “market model” (Beja 1972), wherein returns of a specific asset are related to those of a market index. Specifically,
+Sharpe’s [-@sharpe63] seminal work on portfolio theory outlined what he called “the diagonal model,” whereby returns of various assets are related through a combination of random factors and a common underlying influence. In other words, the total variance in returns of a particular asset is a combination of the variance in larger market returns (i.e., systematic risk) plus residual variance uncorrelated with the asset [i.e., unsystematic risk, @sharpe64]. This work, combined with that of others [e.g., @treynor62; @lintner65], led to the “market model” [@beja72], wherein returns of a specific asset are related to those of a market index. Specifically,
 
 ## References
