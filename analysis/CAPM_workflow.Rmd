@@ -1,0 +1,74 @@
+---
+title: "Workflow: Capital Asset Pricing Model for Ecological Portfolios"
+output:
+  html_document:
+    fig_caption: yes
+    theme: cerulean
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    number_sections: true
+---
+
+```{r set_options, echo=FALSE, cache=FALSE}
+options(width = 100)
+```
+
+***
+
+[__Mark D. Scheuerell__](https://faculty.washington.edu/scheuerl/)  
+_Fish Ecology Division, Northwest Fisheries Science Center, National Marine Fisheries Service, National Oceanic and Atmospheric Administration, Seattle, WA USA, <mark.scheuerell@noaa.gov>_
+
+### Version
+
+This is version `r paste0('0.',format(Sys.time(), '%y.%m.%d'))`.
+
+***
+
+# Initialization
+
+```{r load_pkgs, message=FALSE}
+library(readr)
+library(MARSS)
+```
+
+# Data
+
+For these analyses we will use time series of counts of adult spring/summer Chinook salmon from the Snake River basin in Oregon and Idaho. This group of fish forms an Evolutionarily Significant Unit, which was listed as threatened under the US Endangered Species Act in 1992.
+
+The data were compiled largely through the efforts of Tom Cooney (Northwest Fisheries Science Center, National Marine Fisheries Service, National Oceanic and Atmospheric Administration, Portland, OR USA, <tom.cooney@noaa.gov>).
+
+## Load raw data
+
+The data file has the following columns of information:
+
+* `pop` = abbreviated name of the population
+* `code` = 5-letter abbreviation for MPG (2 letters) & population (3 letters)
+* `MPG` = name of 1 of 5 Major Population Groups
+* `ha` = estimated area (hectares) of available spawning habitat
+* `category` = hatchery supplementation category ("impact" or "control")
+* `period` = time period relative to supplementation
+* `brood.yr` = year when spawning occurred  
+* `nS` = total number of spawning fish
+* `p3` = proportion of age-3 fish
+* `p4` = proportion of age-4 fish
+* `p5` = proportion of age-5 fish
+* `p6` = proportion of age-6 fish
+* `n3` = total number of age-3 fish
+* `n4` = total number of age-4 fish
+* `n5` = total number of age-5 fish
+* `n6` = total number of age-6 fish
+* `pHOS` = proportion of hatchery-origin spawners
+* `nH` = total number of hatchery-origin spawners
+* `nW` = total number of wild spawners
+* `wild.broodstk` = number of wild fish taken for hatchery broodstock
+* `catch.w` = number of wild fish harvested 
+* `hrate.w` = proportion of wild fish harvested
+
+```{r read_data, collapse=TRUE}
+rawdata <- read_csv("https://raw.githubusercontent.com/mdscheuerell/CAPM/master/data/srss_chin.csv")
+head(rawdata)
+```
+
+
+
