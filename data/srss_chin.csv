@@ -477,7 +477,7 @@ Camas,MFCAM,Middle Fork Salmon River,63.4086,control,1991,34,0
 Camas,MFCAM,Middle Fork Salmon River,63.4086,control,1992,22,0
 Camas,MFCAM,Middle Fork Salmon River,63.4086,control,1993,81,0
 Camas,MFCAM,Middle Fork Salmon River,63.4086,control,1994,6,0
-Camas,MFCAM,Middle Fork Salmon River,63.4086,control,1995,0,0
+Camas,MFCAM,Middle Fork Salmon River,63.4086,control,1995,NA,0
 Camas,MFCAM,Middle Fork Salmon River,63.4086,control,1996,3,0
 Camas,MFCAM,Middle Fork Salmon River,63.4086,control,1997,22,0
 Camas,MFCAM,Middle Fork Salmon River,63.4086,control,1998,50,0
@@ -533,7 +533,7 @@ Loon,MFLOO,Middle Fork Salmon River,74.1852,control,1991,41,0
 Loon,MFLOO,Middle Fork Salmon River,74.1852,control,1992,56,0
 Loon,MFLOO,Middle Fork Salmon River,74.1852,control,1993,80,0
 Loon,MFLOO,Middle Fork Salmon River,74.1852,control,1994,3,0
-Loon,MFLOO,Middle Fork Salmon River,74.1852,control,1995,0,0
+Loon,MFLOO,Middle Fork Salmon River,74.1852,control,1995,NA,0
 Loon,MFLOO,Middle Fork Salmon River,74.1852,control,1996,3,0
 Loon,MFLOO,Middle Fork Salmon River,74.1852,control,1997,56,0
 Loon,MFLOO,Middle Fork Salmon River,74.1852,control,1998,108,0
@@ -589,11 +589,11 @@ MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,1991,104,0
 MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,1992,169,0
 MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,1993,328,0
 MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,1994,13,0
-MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,1995,0,0
+MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,1995,NA,0
 MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,1996,26,0
 MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,1997,161,0
 MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,1998,229,0
-MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,1999,0,0
+MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,1999,NA,0
 MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,2000,94,0
 MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,2001,508,0
 MarshCR,MFMAR,Middle Fork Salmon River,44.3858,control,2002,484,0
@@ -634,7 +634,7 @@ SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1980,8,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1981,29,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1982,12,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1983,33,0
-SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1984,0,0
+SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1984,NA,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1985,41,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1986,267,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1987,45,0
@@ -644,12 +644,12 @@ SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1990,87,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1991,108,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1992,11,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1993,132,0
-SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1994,0,0
+SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1994,NA,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1995,2,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1996,28,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1997,37,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1998,102,0
-SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1999,0,0
+SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,1999,NA,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,2000,11,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,2001,87,0
 SulphurCr,MFSUL,Middle Fork Salmon River,14.8618,control,2002,201,0
@@ -1083,7 +1083,7 @@ Valley,SRVAL,Upper Salmon River,42.6649,control,1991,14,0
 Valley,SRVAL,Upper Salmon River,42.6649,control,1992,19,0
 Valley,SRVAL,Upper Salmon River,42.6649,control,1993,62,0
 Valley,SRVAL,Upper Salmon River,42.6649,control,1994,24,0
-Valley,SRVAL,Upper Salmon River,42.6649,control,1995,0,0
+Valley,SRVAL,Upper Salmon River,42.6649,control,1995,NA,0
 Valley,SRVAL,Upper Salmon River,42.6649,control,1996,8,0
 Valley,SRVAL,Upper Salmon River,42.6649,control,1997,33,0
 Valley,SRVAL,Upper Salmon River,42.6649,control,1998,100,0
@@ -1139,7 +1139,7 @@ Yankee,SRYFS,Upper Salmon River,52.2566,control,1991,24,0
 Yankee,SRYFS,Upper Salmon River,52.2566,control,1992,27,0
 Yankee,SRYFS,Upper Salmon River,52.2566,control,1993,20,0
 Yankee,SRYFS,Upper Salmon River,52.2566,control,1994,2,0
-Yankee,SRYFS,Upper Salmon River,52.2566,control,1995,0,0
+Yankee,SRYFS,Upper Salmon River,52.2566,control,1995,NA,0
 Yankee,SRYFS,Upper Salmon River,52.2566,control,1996,4,0
 Yankee,SRYFS,Upper Salmon River,52.2566,control,1997,7,0
 Yankee,SRYFS,Upper Salmon River,52.2566,control,1998,22,0
@@ -1151,7 +1151,7 @@ Yankee,SRYFS,Upper Salmon River,52.2566,control,2003,160,0
 Yankee,SRYFS,Upper Salmon River,52.2566,control,2004,29,0
 Yankee,SRYFS,Upper Salmon River,52.2566,control,2005,11,0
 Yankee,SRYFS,Upper Salmon River,52.2566,control,2006,7,0
-Yankee,SRYFS,Upper Salmon River,52.2566,control,2007,0,0
+Yankee,SRYFS,Upper Salmon River,52.2566,control,2007,NA,0
 Yankee,SRYFS,Upper Salmon River,52.2566,control,2008,340,0.95
 Yankee,SRYFS,Upper Salmon River,52.2566,control,2009,688,0.96
 Yankee,SRYFS,Upper Salmon River,52.2566,control,2010,9,0.27
