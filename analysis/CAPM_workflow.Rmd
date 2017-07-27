@@ -29,6 +29,7 @@ This is version `r paste0('0.',format(Sys.time(), '%y.%m.%d'))`.
 
 ```{r load_pkgs, message=FALSE}
 library(readr)
+library(reshape2)
 library(MARSS)
 ```
 
@@ -38,37 +39,98 @@ For these analyses we will use time series of counts of adult spring/summer Chin
 
 The data were compiled largely through the efforts of Tom Cooney (Northwest Fisheries Science Center, National Marine Fisheries Service, National Oceanic and Atmospheric Administration, Portland, OR USA, <tom.cooney@noaa.gov>).
 
-## Load raw data
+## Assets
 
-The data file has the following columns of information:
+The assets data file has the following columns of information:
 
 * `pop` = abbreviated name of the population
 * `code` = 5-letter abbreviation for MPG (2 letters) & population (3 letters)
-* `MPG` = name of 1 of 5 Major Population Groups
+* `mpg` = name of 1 of 5 Major Population Groups
 * `ha` = estimated area (hectares) of available spawning habitat
 * `category` = hatchery supplementation category ("impact" or "control")
-* `period` = time period relative to supplementation
-* `brood.yr` = year when spawning occurred  
+* `brood_yr` = year when spawning occurred  
 * `nS` = total number of spawning fish
-* `p3` = proportion of age-3 fish
-* `p4` = proportion of age-4 fish
-* `p5` = proportion of age-5 fish
-* `p6` = proportion of age-6 fish
-* `n3` = total number of age-3 fish
-* `n4` = total number of age-4 fish
-* `n5` = total number of age-5 fish
-* `n6` = total number of age-6 fish
-* `pHOS` = proportion of hatchery-origin spawners
-* `nH` = total number of hatchery-origin spawners
-* `nW` = total number of wild spawners
-* `wild.broodstk` = number of wild fish taken for hatchery broodstock
-* `catch.w` = number of wild fish harvested 
-* `hrate.w` = proportion of wild fish harvested
+* `phos` = proportion of hatchery-origin spawners
 
 ```{r read_data, collapse=TRUE}
-rawdata <- read_csv("https://raw.githubusercontent.com/mdscheuerell/CAPM/master/data/srss_chin.csv")
+rawdata <- read.csv("https://raw.githubusercontent.com/mdscheuerell/CAPM/master/data/srss_chin.csv")
 head(rawdata)
 ```
+
+The first thing to do is remove hatchery-origin spawners from the counts, and then convert the counts to log-density based on the estimated spawning area for each population.
+
+```{r get_wild_density}
+dat <- rawdata[,c("mpg", "code", "pop", "category", "brood_yr")]
+dat$Sw <- round(log(rawdata$nS*(1-rawdata$phos)/rawdata$ha), 2)
+```
+
+For easier bookkeeping, I'll also switch the Imnaha's MPG over to the Grande Ronde.
+
+```{r mpg_change}
+## change Imnaha name for easier sorting later
+dat[,"code"] <- sub("IRMAI", "GR_IR", dat[,"code"], fixed=TRUE)
+```
+
+Only a few of the populations have observations going all the way back to the 1950s, so I'll trim the data accordingly.
+
+```{r, trim_years}
+## first brood year to consider
+yr_first <- 1960
+## last brood year to consider
+yr_last <- 2011
+## years of interest
+t_index <- seq(yr_first, yr_last)
+## length of time period
+TT <- length(t_index)
+## subset data
+dat <- subset(dat, brood_yr>=yr_first & brood_yr<=yr_last)
+```
+
+Finally, we will use the `MARSS` package to fit the CAPM model, and it requires the data as an [N x T] matrix.
+
+```{r get_assets}
+assets <- t(dcast(dat, brood_yr ~ code, value.var="Sw")[,-1])
+```
+
+## Market index
+
+The first "market"" index is based on the monthly North Pacific Gyre Oscillation (NPGO) data provided by Emanuele Di Lorenzo, which are available [here](http://www.o3d.org/npgo/npgo.php). We begin by downloading the raw NPGO data and viewing the metadata.
+
+```{r get_NPGO_metadata}
+## URL for NPGO data
+url_NPGO <- "http://www.o3d.org/npgo/npgo.php"
+## raw NPGO data 
+NPGO_raw <- read_lines(url_NPGO)
+## line with data headers
+hdr_NPGO <- which(lapply(NPGO_raw,grep,pattern="YEAR")==1, arr.ind=TRUE)
+## print PDO metadata
+print(NPGO_raw[seq(hdr_NPGO)],quote=FALSE)
+```
+
+Next, we will extract the actual NPGO indices for the years of interest and inspect the file contents. We also want the average annual NPGO index from January 1 through December 31 during the first year that the juvenile salmon are in the ocean (i.e., during their second year of life). Therefore, we need NPGO values from `yr_first + 2` = `r yr_first + 2` through `yr_last + 2` = `r yr_last + 2`.
+
+```{r get_NPGO, message=FALSE}
+## NPGO data for years of interest
+dat_NPGO <- read_table(url_NPGO, col_names = FALSE, skip=hdr_NPGO + (yr_first+2-1950)*12, n_max = TT*12)
+colnames(dat_NPGO) <- c("year","month","NPGO")
+## calculate annual means
+market <- aggregate(dat_NPGO$NPGO, by = list(year = dat_NPGO$year), FUN = mean)
+colnames(market) <- c("brood_yr", "NPGO")
+## match calendar yr to brood year
+market$brood_yr <- market$brood_yr - 2
+## round NPGO values
+market$NPGO <- round(market$NPGO, 3)
+market
+```
+
+## Risk-free index
+
+For these purposes, the risk free index is zero for all years. The idea is that any population with a standardized return of zero is replacing itself and therefore not declining.
+
+```{r risk_free}
+free <- rep(0, TT)
+```
+
 
 
 

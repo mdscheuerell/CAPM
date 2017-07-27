@@ -223,76 +223,173 @@ div.tocify {
 <em>Fish Ecology Division, Northwest Fisheries Science Center, National Marine Fisheries Service, National Oceanic and Atmospheric Administration, Seattle, WA USA, <a href="mailto:mark.scheuerell@noaa.gov">mark.scheuerell@noaa.gov</a></em></p>
 <div id="version" class="section level3">
 <h3><span class="header-section-number">0.0.1</span> Version</h3>
-<p>This is version 0.17.06.27.</p>
+<p>This is version 0.17.07.27.</p>
 <hr />
 </div>
 <div id="initialization" class="section level1">
 <h1><span class="header-section-number">1</span> Initialization</h1>
 <pre class="r"><code>library(readr)
+library(reshape2)
 library(MARSS)</code></pre>
 </div>
 <div id="data" class="section level1">
 <h1><span class="header-section-number">2</span> Data</h1>
-<p>For these analyses we will use time series of counts of adult spring/summer Chinook salmon from the Snake River basin in Oregon and Idaho. This group of fish forms an Evolutionarily Significant Unit, which was listed as threatened under the US Endangered Species Act in 1992. The data were compiled largely through the efforts of Tom Cooney (Northwest Fisheries Science Center, National Marine Fisheries Service, National Oceanic and Atmospheric Administration, Portland, OR USA, <a href="mailto:tom.cooney@noaa.gov">tom.cooney@noaa.gov</a>).</p>
-<div id="load-raw-data" class="section level2">
-<h2><span class="header-section-number">2.1</span> Load raw data</h2>
-<p>The data file has the following columns of information:</p>
+<p>For these analyses we will use time series of counts of adult spring/summer Chinook salmon from the Snake River basin in Oregon and Idaho. This group of fish forms an Evolutionarily Significant Unit, which was listed as threatened under the US Endangered Species Act in 1992.</p>
+<p>The data were compiled largely through the efforts of Tom Cooney (Northwest Fisheries Science Center, National Marine Fisheries Service, National Oceanic and Atmospheric Administration, Portland, OR USA, <a href="mailto:tom.cooney@noaa.gov">tom.cooney@noaa.gov</a>).</p>
+<div id="assets" class="section level2">
+<h2><span class="header-section-number">2.1</span> Assets</h2>
+<p>The assets data file has the following columns of information:</p>
 <ul>
 <li><code>pop</code> = abbreviated name of the population</li>
 <li><code>code</code> = 5-letter abbreviation for MPG (2 letters) &amp; population (3 letters)</li>
-<li><code>MPG</code> = name of 1 of 5 Major Population Groups</li>
+<li><code>mpg</code> = name of 1 of 5 Major Population Groups</li>
 <li><code>ha</code> = estimated area (hectares) of available spawning habitat</li>
 <li><code>category</code> = hatchery supplementation category (“impact” or “control”)</li>
-<li><code>period</code> = time period relative to supplementation</li>
-<li><code>brood.yr</code> = year when spawning occurred<br />
+<li><code>brood_yr</code> = year when spawning occurred<br />
 </li>
 <li><code>nS</code> = total number of spawning fish</li>
-<li><code>p3</code> = proportion of age-3 fish</li>
-<li><code>p4</code> = proportion of age-4 fish</li>
-<li><code>p5</code> = proportion of age-5 fish</li>
-<li><code>p6</code> = proportion of age-6 fish</li>
-<li><code>n3</code> = total number of age-3 fish</li>
-<li><code>n4</code> = total number of age-4 fish</li>
-<li><code>n5</code> = total number of age-5 fish</li>
-<li><code>n6</code> = total number of age-6 fish</li>
-<li><code>pHOS</code> = proportion of hatchery-origin spawners</li>
-<li><code>nH</code> = total number of hatchery-origin spawners</li>
-<li><code>nW</code> = total number of wild spawners</li>
-<li><code>wild.broodstk</code> = number of wild fish taken for hatchery broodstock</li>
-<li><code>catch.w</code> = number of wild fish harvested</li>
-<li><code>hrate.w</code> = proportion of wild fish harvested</li>
+<li><code>phos</code> = proportion of hatchery-origin spawners</li>
 </ul>
-<pre class="r"><code>rawdata &lt;- read_csv(&quot;https://raw.githubusercontent.com/mdscheuerell/CAPM/master/data/srss_chin.csv&quot;)
-## Parsed with column specification:
-## cols(
-##   .default = col_integer(),
-##   pop = col_character(),
-##   code = col_character(),
-##   MPG = col_character(),
-##   ha = col_double(),
-##   category = col_character(),
-##   period = col_character(),
-##   p3 = col_double(),
-##   p4 = col_double(),
-##   p5 = col_double(),
-##   p6 = col_double(),
-##   pHOS = col_double(),
-##   catch.w = col_double(),
-##   hrate.w = col_double()
-## )
-## See spec(...) for full column specifications.
+<pre class="r"><code>rawdata &lt;- read.csv(&quot;https://raw.githubusercontent.com/mdscheuerell/CAPM/master/data/srss_chin.csv&quot;)
 head(rawdata)
-## # A tibble: 6 x 22
-##      pop  code                   MPG      ha category period brood.yr    nS         p3        p4
-##    &lt;chr&gt; &lt;chr&gt;                 &lt;chr&gt;   &lt;dbl&gt;    &lt;chr&gt;  &lt;chr&gt;    &lt;int&gt; &lt;int&gt;      &lt;dbl&gt;     &lt;dbl&gt;
-## 1 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact before     1955   122 0.13000000 0.6500000
-## 2 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact before     1956  2606 0.10000000 0.6700000
-## 3 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact before     1957  1754 0.08000000 0.7100000
-## 4 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact before     1958   486 0.06060606 0.8484848
-## 5 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact before     1959   712 0.08000000 0.7500000
-## 6 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact before     1960  3161 0.06930693 0.8118812
-## # ... with 12 more variables: p5 &lt;dbl&gt;, p6 &lt;dbl&gt;, n3 &lt;int&gt;, n4 &lt;int&gt;, n5 &lt;int&gt;, n6 &lt;int&gt;,
-## #   pHOS &lt;dbl&gt;, nH &lt;int&gt;, nW &lt;int&gt;, wild.broodstk &lt;int&gt;, catch.w &lt;dbl&gt;, hrate.w &lt;dbl&gt;</code></pre>
+##      pop  code                   mpg      ha category brood_yr   nS phos
+## 1 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact     1955  122    0
+## 2 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact     1956 2606    0
+## 3 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact     1957 1754    0
+## 4 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact     1958  486    0
+## 5 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact     1959  712    0
+## 6 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact     1960 3161    0</code></pre>
+<p>The first thing to do is remove hatchery-origin spawners from the counts, and then convert the counts to log-density based on the estimated spawning area for each population.</p>
+<pre class="r"><code>dat &lt;- rawdata[,c(&quot;mpg&quot;, &quot;code&quot;, &quot;pop&quot;, &quot;category&quot;, &quot;brood_yr&quot;)]
+dat$Sw &lt;- round(log(rawdata$nS*(1-rawdata$phos)/rawdata$ha), 2)</code></pre>
+<p>For easier bookkeeping, I’ll also switch the Imnaha’s MPG over to the Grande Ronde.</p>
+<pre class="r"><code>## change Imnaha name for easier sorting later
+dat[,&quot;code&quot;] &lt;- sub(&quot;IRMAI&quot;, &quot;GR_IR&quot;, dat[,&quot;code&quot;], fixed=TRUE)</code></pre>
+<p>Only a few of the populations have observations going all the way back to the 1950s, so I’ll trim the data accordingly.</p>
+<pre class="r"><code>## first brood year to consider
+yr_first &lt;- 1960
+## last brood year to consider
+yr_last &lt;- 2011
+## years of interest
+t_index &lt;- seq(yr_first, yr_last)
+## length of time period
+TT &lt;- length(t_index)
+## subset data
+dat &lt;- subset(dat, brood_yr&gt;=yr_first &amp; brood_yr&lt;=yr_last)</code></pre>
+<p>Finally, we will use the <code>MARSS</code> package to fit the CAPM model, and it requires the data as an [N x T] matrix.</p>
+<pre class="r"><code>assets &lt;- t(dcast(dat, brood_yr ~ code, value.var=&quot;Sw&quot;)[,-1])</code></pre>
+</div>
+<div id="market-index" class="section level2">
+<h2><span class="header-section-number">2.2</span> Market index</h2>
+<p>The first “market”&quot; index is based on the monthly North Pacific Gyre Oscillation (NPGO) data provided by Emanuele Di Lorenzo, which are available <a href="http://www.o3d.org/npgo/npgo.php">here</a>. We begin by downloading the raw NPGO data and viewing the metadata.</p>
+<pre class="r"><code>## URL for NPGO data
+url_NPGO &lt;- &quot;http://www.o3d.org/npgo/npgo.php&quot;
+## raw NPGO data 
+NPGO_raw &lt;- read_lines(url_NPGO)
+## line with data headers
+hdr_NPGO &lt;- which(lapply(NPGO_raw,grep,pattern=&quot;YEAR&quot;)==1, arr.ind=TRUE)
+## print PDO metadata
+print(NPGO_raw[seq(hdr_NPGO)],quote=FALSE)</code></pre>
+<pre><code>##  [1]                                                                                                     
+##  [2] &lt;html&gt;                                                                                              
+##  [3] &lt;body&gt;                                                                                              
+##  [4]                                                                                                     
+##  [5] &lt;pre&gt;#  Last update 29-Mar-2017 by E. Di Lorenzo                                                    
+##  [6] #  NPGO index monthly averages                                                                      
+##  [7] #  from Jan-1950  to  Feb-2017                                                                      
+##  [8] #                                                                                                   
+##  [9] #  WARNING: Values after Dec-2004 are updated                                                       
+## [10] #  using Satellite SSHa from AVISO Delayed Time product.                                            
+## [11] #  http://opendap.aviso.oceanobs.com/thredds/dodsC/dataset-duacs-dt-global-allsat-msla-h            
+## [12] #                                                                                                   
+## [13] #  PRELIMINARY: Values after Jan-2016 are preliminary and updated                                   
+## [14] #  using Satellite SSHa from AVISO Near Real Time product.                                          
+## [15] #  http://opendap.aviso.oceanobs.com/thredds/dodsC/dataset-duacs-nrt-over30d-global-allsat-msla-h   
+## [16] #                                                                                                   
+## [17] #  The update is performed by taking the NPGO spatial pattern of Di Lorenzo et al. 2008             
+## [18] #  computed over the period 1950-2004, and projecting the AVISO Satellite SSHa.                     
+## [19] #  During the pre-processing of the AVISO data, we remove the seasonal cycle based on               
+## [20] #  the 1993-2004 seasonal means.                                                                    
+## [21] #                                                                                                   
+## [22] #  AVISO PRODUCT UPDATE Summer 2014: AVISO has released a re-processed dataset for the sea level.   
+## [23] #  Starting from the November 2014, the NPGO index is computed with this updated dataset. NPGO      
+## [24] #  values from 2004 onward have been recomputed with very minor differences from previous releases. 
+## [25] #                                                                                                   
+## [26] #  Ref:                                                                                             
+## [27] #  Di Lorenzo et al., 2008: North Pacific Gyre Oscillation                                          
+## [28] #  links ocean climate and ecosystem change, GRL.                                                   
+## [29] #                                                                                                   
+## [30] #      YEAR            MONTH        NPGO index</code></pre>
+<p>Next, we will extract the actual NPGO indices for the years of interest and inspect the file contents. We also want the average annual NPGO index from January 1 through December 31 during the first year that the juvenile salmon are in the ocean (i.e., during their second year of life). Therefore, we need NPGO values from <code>yr_first + 2</code> = 1962 through <code>yr_last + 2</code> = 2013.</p>
+<pre class="r"><code>## NPGO data for years of interest
+dat_NPGO &lt;- read_table(url_NPGO, col_names = FALSE, skip=hdr_NPGO + (yr_first+2-1950)*12, n_max = TT*12)
+colnames(dat_NPGO) &lt;- c(&quot;year&quot;,&quot;month&quot;,&quot;NPGO&quot;)
+## calculate annual means
+market &lt;- aggregate(dat_NPGO$NPGO, by = list(year = dat_NPGO$year), FUN = mean)
+colnames(market) &lt;- c(&quot;brood_yr&quot;, &quot;NPGO&quot;)
+## match calendar yr to brood year
+market$brood_yr &lt;- market$brood_yr - 2
+## round NPGO values
+market$NPGO &lt;- round(market$NPGO, 3)
+market</code></pre>
+<pre><code>##    brood_yr   NPGO
+## 1      1960 -0.093
+## 2      1961 -0.235
+## 3      1962  0.544
+## 4      1963 -0.837
+## 5      1964 -0.956
+## 6      1965 -0.700
+## 7      1966 -0.851
+## 8      1967 -0.388
+## 9      1968  0.061
+## 10     1969  0.382
+## 11     1970 -0.659
+## 12     1971  0.127
+## 13     1972 -0.009
+## 14     1973  0.799
+## 15     1974  1.863
+## 16     1975  1.249
+## 17     1976  0.504
+## 18     1977 -0.737
+## 19     1978 -0.749
+## 20     1979 -0.222
+## 21     1980 -0.687
+## 22     1981 -0.092
+## 23     1982  0.621
+## 24     1983 -0.394
+## 25     1984 -0.733
+## 26     1985  0.429
+## 27     1986  1.324
+## 28     1987  0.612
+## 29     1988 -0.202
+## 30     1989 -0.499
+## 31     1990 -1.095
+## 32     1991 -1.902
+## 33     1992 -1.212
+## 34     1993 -1.039
+## 35     1994 -0.973
+## 36     1995 -0.658
+## 37     1996  0.545
+## 38     1997  1.516
+## 39     1998  1.886
+## 40     1999  2.081
+## 41     2000  1.474
+## 42     2001  0.959
+## 43     2002  0.209
+## 44     2003 -1.382
+## 45     2004 -0.555
+## 46     2005  0.593
+## 47     2006  1.455
+## 48     2007  0.737
+## 49     2008  1.369
+## 50     2009  0.858
+## 51     2010  1.477
+## 52     2011  0.344</code></pre>
+</div>
+<div id="risk-free-index" class="section level2">
+<h2><span class="header-section-number">2.3</span> Risk-free index</h2>
+<p>For these purposes, the risk free index is zero for all years. The idea is that any population with a standardized return of zero is replacing itself and therefore not declining.</p>
+<pre class="r"><code>free &lt;- rep(0, TT)</code></pre>
 </div>
 </div>
 
