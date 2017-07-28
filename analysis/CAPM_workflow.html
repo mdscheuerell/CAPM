@@ -223,7 +223,7 @@ div.tocify {
 <em>Fish Ecology Division, Northwest Fisheries Science Center, National Marine Fisheries Service, National Oceanic and Atmospheric Administration, Seattle, WA USA, <a href="mailto:mark.scheuerell@noaa.gov">mark.scheuerell@noaa.gov</a></em></p>
 <div id="version" class="section level3">
 <h3><span class="header-section-number">0.0.1</span> Version</h3>
-<p>This is version 0.17.07.27.</p>
+<p>This is version 0.17.07.28.</p>
 <hr />
 </div>
 <div id="initialization" class="section level1">
@@ -259,12 +259,17 @@ head(rawdata)
 ## 4 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact     1958  486    0
 ## 5 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact     1959  712    0
 ## 6 CathCr GRCAT Grande Ronde / Imnaha 29.1522   impact     1960 3161    0</code></pre>
-<p>The first thing to do is remove hatchery-origin spawners from the counts, and then convert the counts to log-density based on the estimated spawning area for each population.</p>
+<p>The first thing to do is remove hatchery-origin spawners from the counts, and then convert the counts to log-density based on the estimated spawning area for each population. In a couple of years, incomplete censuses with small sample sizes led to estimated fractions of wild fish equal to zero. I will treat those as NA.</p>
 <pre class="r"><code>dat &lt;- rawdata[,c(&quot;mpg&quot;, &quot;code&quot;, &quot;pop&quot;, &quot;category&quot;, &quot;brood_yr&quot;)]
-dat$Sw &lt;- round(log(rawdata$nS*(1-rawdata$phos)/rawdata$ha), 2)</code></pre>
+## calculate log-density
+dat$Sw &lt;- round(log(rawdata$nS*(1-rawdata$phos)/rawdata$ha), 2)
+## replace possible -Inf with NA
+dat$Sw[is.infinite(dat$Sw)] &lt;- NA</code></pre>
 <p>For easier bookkeeping, I’ll also switch the Imnaha’s MPG over to the Grande Ronde.</p>
 <pre class="r"><code>## change Imnaha name for easier sorting later
-dat[,&quot;code&quot;] &lt;- sub(&quot;IRMAI&quot;, &quot;GR_IR&quot;, dat[,&quot;code&quot;], fixed=TRUE)</code></pre>
+dat[,&quot;code&quot;] &lt;- sub(&quot;IRMAI&quot;, &quot;GR_IR&quot;, dat[,&quot;code&quot;], fixed=TRUE)
+## MPG abbreviations
+mpg_ID &lt;- c(&quot;GR&quot;, &quot;MF&quot;, &quot;SF&quot;, &quot;SR&quot;)</code></pre>
 <p>Only a few of the populations have observations going all the way back to the 1950s, so I’ll trim the data accordingly.</p>
 <pre class="r"><code>## first brood year to consider
 yr_first &lt;- 1960
@@ -276,8 +281,12 @@ t_index &lt;- seq(yr_first, yr_last)
 TT &lt;- length(t_index)
 ## subset data
 dat &lt;- subset(dat, brood_yr&gt;=yr_first &amp; brood_yr&lt;=yr_last)</code></pre>
-<p>Finally, we will use the <code>MARSS</code> package to fit the CAPM model, and it requires the data as an [N x T] matrix.</p>
-<pre class="r"><code>assets &lt;- t(dcast(dat, brood_yr ~ code, value.var=&quot;Sw&quot;)[,-1])</code></pre>
+<p>Finally, I will use the <code>MARSS</code> package to fit the CAPM model, which requires the data to be formatted as an [N x T] matrix.</p>
+<pre class="r"><code>assets &lt;- t(dcast(dat, brood_yr ~ code, value.var=&quot;Sw&quot;)[,-1])
+## number of popns
+NN &lt;- dim(assets)[1]
+## names of popns
+names_pop &lt;- rownames(assets)</code></pre>
 </div>
 <div id="market-index" class="section level2">
 <h2><span class="header-section-number">2.2</span> Market index</h2>
@@ -322,75 +331,374 @@ print(NPGO_raw[seq(hdr_NPGO)],quote=FALSE)</code></pre>
 ## [30] #      YEAR            MONTH        NPGO index</code></pre>
 <p>Next, we will extract the actual NPGO indices for the years of interest and inspect the file contents. We also want the average annual NPGO index from January 1 through December 31 during the first year that the juvenile salmon are in the ocean (i.e., during their second year of life). Therefore, we need NPGO values from <code>yr_first + 2</code> = 1962 through <code>yr_last + 2</code> = 2013.</p>
 <pre class="r"><code>## NPGO data for years of interest
-dat_NPGO &lt;- read_table(url_NPGO, col_names = FALSE, skip=hdr_NPGO + (yr_first+2-1950)*12, n_max = TT*12)
-colnames(dat_NPGO) &lt;- c(&quot;year&quot;,&quot;month&quot;,&quot;NPGO&quot;)
+raw_NPGO &lt;- read_table(url_NPGO, col_names = FALSE, skip=hdr_NPGO + (yr_first+2-1950)*12, n_max = TT*12)
+colnames(raw_NPGO) &lt;- c(&quot;year&quot;,&quot;month&quot;,&quot;NPGO&quot;)
 ## calculate annual means
-market &lt;- aggregate(dat_NPGO$NPGO, by = list(year = dat_NPGO$year), FUN = mean)
-colnames(market) &lt;- c(&quot;brood_yr&quot;, &quot;NPGO&quot;)
+dat_NPGO &lt;- aggregate(raw_NPGO$NPGO, by = list(year = raw_NPGO$year), FUN = mean)
+colnames(dat_NPGO) &lt;- c(&quot;brood_yr&quot;, &quot;NPGO&quot;)
 ## match calendar yr to brood year
-market$brood_yr &lt;- market$brood_yr - 2
-## round NPGO values
-market$NPGO &lt;- round(market$NPGO, 3)
-market</code></pre>
-<pre><code>##    brood_yr   NPGO
-## 1      1960 -0.093
-## 2      1961 -0.235
-## 3      1962  0.544
-## 4      1963 -0.837
-## 5      1964 -0.956
-## 6      1965 -0.700
-## 7      1966 -0.851
-## 8      1967 -0.388
-## 9      1968  0.061
-## 10     1969  0.382
-## 11     1970 -0.659
-## 12     1971  0.127
-## 13     1972 -0.009
-## 14     1973  0.799
-## 15     1974  1.863
-## 16     1975  1.249
-## 17     1976  0.504
-## 18     1977 -0.737
-## 19     1978 -0.749
-## 20     1979 -0.222
-## 21     1980 -0.687
-## 22     1981 -0.092
-## 23     1982  0.621
-## 24     1983 -0.394
-## 25     1984 -0.733
-## 26     1985  0.429
-## 27     1986  1.324
-## 28     1987  0.612
-## 29     1988 -0.202
-## 30     1989 -0.499
-## 31     1990 -1.095
-## 32     1991 -1.902
-## 33     1992 -1.212
-## 34     1993 -1.039
-## 35     1994 -0.973
-## 36     1995 -0.658
-## 37     1996  0.545
-## 38     1997  1.516
-## 39     1998  1.886
-## 40     1999  2.081
-## 41     2000  1.474
-## 42     2001  0.959
-## 43     2002  0.209
-## 44     2003 -1.382
-## 45     2004 -0.555
-## 46     2005  0.593
-## 47     2006  1.455
-## 48     2007  0.737
-## 49     2008  1.369
-## 50     2009  0.858
-## 51     2010  1.477
-## 52     2011  0.344</code></pre>
+dat_NPGO$brood_yr &lt;- dat_NPGO$brood_yr - 2
+dat_NPGO
+## market index
+market &lt;- round(dat_NPGO$NPGO, 3)</code></pre>
+<pre><code>##    brood_yr         NPGO
+## 1      1960 -0.093424126
+## 2      1961 -0.234721502
+## 3      1962  0.544102425
+## 4      1963 -0.837212701
+## 5      1964 -0.956356193
+## 6      1965 -0.699724801
+## 7      1966 -0.850601763
+## 8      1967 -0.387628509
+## 9      1968  0.061043154
+## 10     1969  0.381984271
+## 11     1970 -0.659303726
+## 12     1971  0.126585564
+## 13     1972 -0.009310217
+## 14     1973  0.798500537
+## 15     1974  1.863211350
+## 16     1975  1.249270341
+## 17     1976  0.504466636
+## 18     1977 -0.737188575
+## 19     1978 -0.749107276
+## 20     1979 -0.221840562
+## 21     1980 -0.686691381
+## 22     1981 -0.092064694
+## 23     1982  0.620750037
+## 24     1983 -0.393901047
+## 25     1984 -0.732847288
+## 26     1985  0.429174729
+## 27     1986  1.323636763
+## 28     1987  0.612240617
+## 29     1988 -0.201546121
+## 30     1989 -0.498914711
+## 31     1990 -1.094918870
+## 32     1991 -1.901992588
+## 33     1992 -1.211598783
+## 34     1993 -1.039208546
+## 35     1994 -0.972836612
+## 36     1995 -0.657690616
+## 37     1996  0.544553283
+## 38     1997  1.515780517
+## 39     1998  1.885861292
+## 40     1999  2.080693375
+## 41     2000  1.473593960
+## 42     2001  0.958507189
+## 43     2002  0.209460249
+## 44     2003 -1.381917947
+## 45     2004 -0.555041996
+## 46     2005  0.593098207
+## 47     2006  1.455274563
+## 48     2007  0.736914838
+## 49     2008  1.368568881
+## 50     2009  0.857692208
+## 51     2010  1.476522402
+## 52     2011  0.344364695</code></pre>
 </div>
 <div id="risk-free-index" class="section level2">
 <h2><span class="header-section-number">2.3</span> Risk-free index</h2>
 <p>For these purposes, the risk free index is zero for all years. The idea is that any population with a standardized return of zero is replacing itself and therefore not declining.</p>
 <pre class="r"><code>free &lt;- rep(0, TT)</code></pre>
 </div>
+</div>
+<div id="capm-in-marss" class="section level1">
+<h1><span class="header-section-number">3</span> CAPM in MARSS</h1>
+<pre class="r"><code>## empty list for model results
+mod_res &lt;- vector(&quot;list&quot;, length(mpg_ID))
+## empty beta forecasts
+betas4 &lt;- betas4_se &lt;- NULL
+## empty alphas &amp; betas
+alphas &lt;- alphas_se &lt;- betas &lt;- betas_se &lt;- NULL
+
+## number of regr params = level + slope
+mm &lt;- 2
+
+## CAPMs for each MPG
+for(i in 1:length(mpg_ID)) {
+  
+  ## print loop ID
+  print(paste0(&quot;i = &quot;,i,&quot;; MPG = &quot;,mpg_ID[i]))
+  ## get popns
+  assets_mpg &lt;- assets[grep(mpg_ID[i], rownames(assets)),]
+  ## number of assets
+  nn &lt;- dim(assets_mpg)[1]
+  
+  ## Process eqn
+  ## B is Identity
+  BB &lt;- &quot;identity&quot;
+  ## U is col vec of 0's
+  UU &lt;- &quot;zero&quot;
+  ## Q will be block diagonal
+  QQ &lt;- matrix(list(0),mm*nn,mm*nn)
+  ## upper L block for alpha
+  aa &lt;- 1:nn
+  ## equal var-cov
+  # QQ[aa,aa] &lt;- &quot;alpha.cov&quot;
+  # diag(QQ[aa,aa]) &lt;- &quot;alpha.var&quot;
+  ## diagonal &amp; unequal
+  # diag(QQ[aa,aa]) &lt;- paste0(&quot;alpha&quot;,seq(nn))
+  # for(j in 1:(nn-1)) {
+  #  for(k in (j+1):nn) {
+  #      QQ[j,k] &lt;- paste0(&quot;alpha&quot;,j,k)
+  #      QQ[k,j] &lt;- paste0(&quot;alpha&quot;,j,k)
+  #  }
+  # }
+  ## lower R block for beta
+  bb &lt;- aa + nn
+  ## equal var-cov
+  # QQ[bb,bb] &lt;- &quot;beta.cov&quot;
+  # diag(QQ[bb,bb]) &lt;- &quot;beta.var&quot;
+  ## diagonal &amp; unequal
+  diag(QQ[bb,bb]) &lt;- paste0(&quot;beta&quot;,seq(nn))
+  for(j in 1:(nn-1)) {
+    for(k in (j+1):nn) {
+      QQ[j+nn,k+nn] &lt;- paste0(&quot;beta&quot;,j,k)
+      QQ[k+nn,j+nn] &lt;- paste0(&quot;beta&quot;,j,k)
+    }
+  }
+  
+  ## Observation eqn
+  ## Z is array of regr variables (ie, 1's and market returns)
+  ZZ &lt;- array(NA, c(nn,mm*nn,TT))
+  for(t in 1:TT) {
+    ZZ[,,t] &lt;- cbind(1,market[t]) %x% diag(nn)
+  }
+  ## A is col vec of 0's
+  AA &lt;- &quot;zero&quot;
+  ## assume same obs var &amp; cov
+  ##RR &lt;- matrix(list(0),nn,nn)
+  ##RR[aa,aa] &lt;- &quot;obs.cov&quot;
+  ##diag(RR[aa,aa]) &lt;- &quot;obs.var&quot;
+  RR &lt;- &quot;diagonal and equal&quot;
+  
+  ## Initial states
+  ##x0 &lt;- rbind(matrix(&quot;pi.a&quot;,nn,1), matrix(&quot;pi.b&quot;,nn,1))
+  ##V0 &lt;- 100*diag(mm*nn)
+  ##x0 &lt;- rbind(matrix(0,nn,1), matrix(1,nn,1))
+  ##V0 &lt;- matrix(list(0),mm*nn,mm*nn)
+  ##diag(V0[aa,aa]) &lt;- &quot;var.a&quot;
+  ##diag(V0[bb,bb]) &lt;- &quot;var.b&quot;
+  
+  ## starting values for regr parameters
+  ini_list &lt;- list(x0=matrix(1, mm*nn, 1))
+  
+  ## list of model matrices &amp; vectors
+  mod_list &lt;- list(B=BB, U=UU, Q=QQ, Z=ZZ, A=AA, R=RR)
+  ##mod_list &lt;- list(B=BB, U=UU, Q=QQ, Z=ZZ, A=AA, R=RR, x0=x0, V0=V0)
+  
+  ## list of control values
+  con_list &lt;- list(safe=TRUE, allow.degen=FALSE,
+                   conv.test.slope.tol=2, abstol=1e-04, maxit=5e04)
+  
+  ## fit multivariate DLM
+  mod_res[[i]] &lt;- MARSS(assets_mpg, inits=ini_list, model=mod_list, control=con_list)
+  
+  ## get list of Kalman filter output
+  kf_out = MARSSkfss(mod_res[[i]])
+  
+  ## ts of forecasted betas
+  betas4 &lt;- cbind(betas4,t(kf_out$xtt1[(1:nn)+nn,]))
+  
+  ## ts of SE of betas; nxT matrix
+  betas4_se &lt;- cbind(betas4_se,sqrt(t(apply(kf_out$Vtt1,3,diag)[(1:nn)+nn,])))
+  
+  ## ts of alphas
+  alphas &lt;- cbind(alphas,t(mod_res[[i]]$states[1:nn,]))
+  ## ts of SE{alphas}
+  alphas_se &lt;- cbind(alphas_se,t(mod_res[[i]]$states.se[1:nn,]))
+  
+  ## ts of betas
+  betas &lt;- cbind(betas,t(mod_res[[i]]$states[(1:nn)+nn,]))
+  ## ts of SE{betas}
+  betas_se &lt;- cbind(betas_se,t(mod_res[[i]]$states.se[(1:nn)+nn,]))
+  
+}</code></pre>
+<pre><code>## [1] &quot;i = 1; MPG = GR&quot;
+## Success! abstol and log-log tests passed at 1315 iterations.
+## Alert: conv.test.slope.tol is 2.
+## Test with smaller values (&lt;0.1) to ensure convergence.
+## 
+## MARSS fit is
+## Estimation method: kem 
+## Convergence test: conv.test.slope.tol = 2, abstol = 1e-04
+## Estimation converged in 1315 iterations. 
+## Log-likelihood: -374.9923 
+## AIC: 817.9846   AICc: 826.7669   
+##  
+##          Estimate
+## R.diag      0.365
+## Q.beta1     3.691
+## Q.beta12    5.075
+## Q.beta13    3.582
+## Q.beta14    2.648
+## Q.beta15    4.648
+## Q.beta16    3.540
+## Q.beta2     6.978
+## Q.beta23    4.925
+## Q.beta24    3.641
+## Q.beta25    6.391
+## Q.beta26    4.867
+## Q.beta3     3.487
+## Q.beta34    2.578
+## Q.beta35    4.512
+## Q.beta36    3.447
+## Q.beta4     1.906
+## Q.beta45    3.336
+## Q.beta46    2.549
+## Q.beta5     5.853
+## Q.beta56    4.459
+## Q.beta6     3.408
+## x0.X1       3.186
+## x0.X2       2.942
+## x0.X3       2.007
+## x0.X4       2.668
+## x0.X5       2.088
+## x0.X6       2.466
+## x0.X7      -2.452
+## x0.X8      -3.132
+## x0.X9      -2.876
+## x0.X10     -2.109
+## x0.X11     -3.273
+## x0.X12     -2.912
+## 
+## Standard errors have not been calculated. 
+## Use MARSSparamCIs to compute CIs and bias estimates.
+## 
+## [1] &quot;i = 2; MPG = MF&quot;
+## Success! abstol and log-log tests passed at 1370 iterations.
+## Alert: conv.test.slope.tol is 2.
+## Test with smaller values (&lt;0.1) to ensure convergence.
+## 
+## MARSS fit is
+## Estimation method: kem 
+## Convergence test: conv.test.slope.tol = 2, abstol = 1e-04
+## Estimation converged in 1370 iterations. 
+## Log-likelihood: -387.683 
+## AIC: 843.3661   AICc: 852.2799   
+##  
+##          Estimate
+## R.diag      0.371
+## Q.beta1     9.313
+## Q.beta12    8.202
+## Q.beta13   10.159
+## Q.beta14    9.746
+## Q.beta15    9.723
+## Q.beta16    8.340
+## Q.beta2     7.223
+## Q.beta23    8.948
+## Q.beta24    8.583
+## Q.beta25    8.563
+## Q.beta26    7.345
+## Q.beta3    11.087
+## Q.beta34   10.632
+## Q.beta35   10.607
+## Q.beta36    9.099
+## Q.beta4    10.199
+## Q.beta45   10.175
+## Q.beta46    8.728
+## Q.beta5    10.151
+## Q.beta56    8.707
+## Q.beta6     7.469
+## x0.X1       2.382
+## x0.X2       0.807
+## x0.X3       1.043
+## x0.X4       0.831
+## x0.X5       2.515
+## x0.X6       2.315
+## x0.X7      -6.089
+## x0.X8      -5.286
+## x0.X9      -6.408
+## x0.X10     -6.331
+## x0.X11     -6.309
+## x0.X12     -5.370
+## 
+## Standard errors have not been calculated. 
+## Use MARSSparamCIs to compute CIs and bias estimates.
+## 
+## [1] &quot;i = 3; MPG = SF&quot;
+## Success! abstol and log-log tests passed at 984 iterations.
+## Alert: conv.test.slope.tol is 2.
+## Test with smaller values (&lt;0.1) to ensure convergence.
+## 
+## MARSS fit is
+## Estimation method: kem 
+## Convergence test: conv.test.slope.tol = 2, abstol = 1e-04
+## Estimation converged in 984 iterations. 
+## Log-likelihood: -178.2274 
+## AIC: 382.4547   AICc: 385.1711   
+##  
+##          Estimate
+## R.diag      0.246
+## Q.beta1     3.117
+## Q.beta12    2.069
+## Q.beta13    2.479
+## Q.beta2     1.373
+## Q.beta23    1.647
+## Q.beta3     1.985
+## x0.X1       0.871
+## x0.X2       1.115
+## x0.X3       1.592
+## x0.X4      -5.263
+## x0.X5      -3.551
+## x0.X6      -4.328
+## 
+## Standard errors have not been calculated. 
+## Use MARSSparamCIs to compute CIs and bias estimates.
+## 
+## [1] &quot;i = 4; MPG = SR&quot;
+## Success! abstol and log-log tests passed at 1223 iterations.
+## Alert: conv.test.slope.tol is 2.
+## Test with smaller values (&lt;0.1) to ensure convergence.
+## 
+## MARSS fit is
+## Estimation method: kem 
+## Convergence test: conv.test.slope.tol = 2, abstol = 1e-04
+## Estimation converged in 1223 iterations. 
+## Log-likelihood: -367.5012 
+## AIC: 803.0023   AICc: 811.7523   
+##  
+##          Estimate
+## R.diag      0.221
+## Q.beta1    19.465
+## Q.beta12   17.843
+## Q.beta13   13.314
+## Q.beta14   17.273
+## Q.beta15   20.502
+## Q.beta16   25.578
+## Q.beta2    16.446
+## Q.beta23   12.265
+## Q.beta24   15.846
+## Q.beta25   18.746
+## Q.beta26   23.469
+## Q.beta3     9.155
+## Q.beta34   11.824
+## Q.beta35   13.980
+## Q.beta36   17.492
+## Q.beta4    15.329
+## Q.beta45   18.184
+## Q.beta46   22.698
+## Q.beta5    21.636
+## Q.beta56   26.957
+## Q.beta6    33.664
+## x0.X1       2.510
+## x0.X2       1.706
+## x0.X3      -0.329
+## x0.X4       2.963
+## x0.X5       2.302
+## x0.X6       1.689
+## x0.X7      -3.537
+## x0.X8      -3.193
+## x0.X9      -2.493
+## x0.X10     -3.224
+## x0.X11     -3.860
+## x0.X12     -5.131
+## 
+## Standard errors have not been calculated. 
+## Use MARSSparamCIs to compute CIs and bias estimates.</code></pre>
+<pre class="r"><code>## assign names
+colnames(alphas) &lt;- colnames(alphas_se) &lt;- names_pop
+colnames(betas) &lt;- colnames(betas_se) &lt;- names_pop
+colnames(betas4) &lt;- colnames(betas4_se) &lt;- names_pop</code></pre>
 </div>
 
 
