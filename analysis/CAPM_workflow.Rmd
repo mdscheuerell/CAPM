@@ -100,6 +100,7 @@ I will use the `MARSS` package to fit the CAPM model, which requires the data to
 assets <- dcast(dat, brood_yr ~ code, value.var="Sw")[,-1]
 ## compute differences
 assets <- t(apply(assets, 2, diff, lag=gt))
+matplot(t(assets), type="b")
 ## number of popns
 NN <- dim(assets)[1]
 ## names of popns
@@ -146,11 +147,11 @@ The first "market"" index is based on the monthly North Pacific Gyre Oscillation
 ## URL for NPGO data
 url_NPGO <- "http://www.o3d.org/npgo/npgo.php"
 ## raw NPGO data 
-NPGO_raw <- read_lines(url_NPGO)
+all_NPGO <- read_lines(url_NPGO)
 ## line with data headers
-hdr_NPGO <- which(lapply(NPGO_raw,grep,pattern="YEAR")==1, arr.ind=TRUE)
+hdr_NPGO <- which(lapply(all_NPGO,grep,pattern="YEAR")==1, arr.ind=TRUE)
 ## print PDO metadata
-print(NPGO_raw[seq(hdr_NPGO)],quote=FALSE)
+print(all_NPGO[seq(hdr_NPGO)],quote=FALSE)
 ```
 
 Next, we will extract the actual NPGO indices for the years of interest and inspect the file contents. We also want the average annual NPGO index from January 1 through December 31 during the first year that the juvenile salmon are in the ocean (i.e., during their second year of life). Therefore, we need NPGO values from `yr_first + 2` = `r yr_first + 2` through `yr_last + 2` = `r yr_last + 2`.
@@ -167,6 +168,8 @@ dat_NPGO$brood_yr <- dat_NPGO$brood_yr - 2
 dat_NPGO
 ## market index
 market <- round(dat_NPGO$NPGO, 3)
+plot.ts(market)
+cor(market, t(assets), use="pairwise.complete.obs")
 ```
 
 ## Risk-free index
@@ -179,7 +182,7 @@ free <- rep(0, TT)
 
 # CAPM in MARSS
 
-## v1: static level
+## v1: a static; b unconstrained
 
 ```{r CAPM_v1, cache=TRUE}
 ## empty list for model results
@@ -290,7 +293,7 @@ colnames(betas4) <- colnames(betas4_se) <- names_pop
 
 ### Plots of results
 
-```{r plot_betas_v1, fig.height=5, fig.width=9}
+```{r plot_betas_v1_1, fig.height=5, fig.width=9}
 betas <- betas[,names_mat$ID]
 
 # total num of ts
@@ -342,7 +345,170 @@ mtext("Year", side=1, outer=TRUE, line=3, cex=1.2)
 mtext(expression(beta[italic(t)]), side=2, outer=TRUE, line=2.2, cex=1.5)
 ```
 
-## v2: dynamic level
+## v1: a static; b equalvarcov
+
+```{r CAPM_v1_2, cache=TRUE}
+## empty list for model results
+mod_res <- vector("list", length(mpg_ID))
+## empty beta forecasts
+betas4 <- betas4_se <- NULL
+## empty alphas & betas
+alphas <- alphas_se <- betas <- betas_se <- NULL
+
+## number of regr params = level + slope
+mm <- 2
+
+## CAPMs for each MPG
+for(i in 1:length(mpg_ID)) {
+  
+  ## print loop ID
+  print(paste0("i = ",i,"; MPG = ",mpg_ID[i]))
+  ## get popns
+  assets_mpg <- assets[grep(mpg_ID[i], rownames(assets)),]
+  ## number of assets
+  nn <- dim(assets_mpg)[1]
+  
+  ## Process eqn
+  ## B is Identity
+  BB <- "identity"
+  ## U is col vec of 0's
+  UU <- "zero"
+  ## Q will be block diagonal
+  QQ <- matrix(list(0),mm*nn,mm*nn)
+  ## upper L block for alpha
+  aa <- 1:nn
+  ## lower R block for beta
+  bb <- aa + nn
+  ## equal var-cov
+  # QQ[bb,bb] <- "beta.cov"
+  # diag(QQ[bb,bb]) <- "beta.var"
+  ## diagonal & unequal
+  diag(QQ[bb,bb]) <- paste0("beta",seq(nn))
+  for(j in 1:(nn-1)) {
+    for(k in (j+1):nn) {
+      QQ[j+nn,k+nn] <- paste0("beta",j,k)
+      QQ[k+nn,j+nn] <- paste0("beta",j,k)
+    }
+  }
+  
+  ## Observation eqn
+  ## Z is array of regr variables (ie, 1's and market returns)
+  ZZ <- array(NA, c(nn,mm*nn,TT))
+  for(t in 1:TT) {
+    ZZ[,,t] <- cbind(1,market[t]) %x% diag(nn)
+  }
+  ## A is col vec of 0's
+  AA <- "zero"
+  ## assume same obs var & cov
+  ##RR <- matrix(list(0),nn,nn)
+  ##RR[aa,aa] <- "obs.cov"
+  ##diag(RR[aa,aa]) <- "obs.var"
+  RR <- "diagonal and equal"
+  
+  ## Initial states
+  ##x0 <- rbind(matrix("pi.a",nn,1), matrix("pi.b",nn,1))
+  ##V0 <- 100*diag(mm*nn)
+  ##x0 <- rbind(matrix(0,nn,1), matrix(1,nn,1))
+  ##V0 <- matrix(list(0),mm*nn,mm*nn)
+  ##diag(V0[aa,aa]) <- "var.a"
+  ##diag(V0[bb,bb]) <- "var.b"
+  
+  ## starting values for regr parameters
+  ini_list <- list(x0=matrix(1, mm*nn, 1))
+  
+  ## list of model matrices & vectors
+  mod_list <- list(B=BB, U=UU, Q=QQ, Z=ZZ, A=AA, R=RR)
+  ##mod_list <- list(B=BB, U=UU, Q=QQ, Z=ZZ, A=AA, R=RR, x0=x0, V0=V0)
+  
+  ## list of control values
+  con_list <- list(safe=TRUE, allow.degen=FALSE,
+                   conv.test.slope.tol=2, abstol=1e-04, maxit=5e04)
+  
+  ## fit multivariate DLM
+  mod_res[[i]] <- MARSS(assets_mpg, inits=ini_list, model=mod_list, control=con_list)
+  
+  ## get list of Kalman filter output
+  kf_out = MARSSkfss(mod_res[[i]])
+  
+  ## ts of forecasted betas
+  betas4 <- cbind(betas4,t(kf_out$xtt1[(1:nn)+nn,]))
+  
+  ## ts of SE of betas; nxT matrix
+  betas4_se <- cbind(betas4_se,sqrt(t(apply(kf_out$Vtt1,3,diag)[(1:nn)+nn,])))
+  
+  ## ts of alphas
+  alphas <- cbind(alphas,t(mod_res[[i]]$states[1:nn,]))
+  ## ts of SE{alphas}
+  alphas_se <- cbind(alphas_se,t(mod_res[[i]]$states.se[1:nn,]))
+  
+  ## ts of betas
+  betas <- cbind(betas,t(mod_res[[i]]$states[(1:nn)+nn,]))
+  ## ts of SE{betas}
+  betas_se <- cbind(betas_se,t(mod_res[[i]]$states.se[(1:nn)+nn,]))
+  
+}
+
+## assign names
+colnames(alphas) <- colnames(alphas_se) <- names_pop
+colnames(betas) <- colnames(betas_se) <- names_pop
+colnames(betas4) <- colnames(betas4_se) <- names_pop
+```
+
+### Plots of results
+
+```{r plot_betas_v1_2, fig.height=5, fig.width=9}
+betas <- betas[,names_mat$ID]
+
+# total num of ts
+NN <- dim(betas)[2]
+
+# set up colors; group by MPG
+col.pal <- c(rainbow(6, start=0.05, end=0.12),
+			 rainbow(3, start=0.2, end=0.45, v=0.7),
+			 rainbow(6, start=0.8, end=0.95, v=0.85),
+			 rainbow(6, start=0.55, end=0.7))
+
+# num of rows for plot
+nr <- 3
+# num of cols for plot
+nc <- 7
+
+# set graphics params
+par(mfcol=c(nr,nc), mai=c(0.1,0.07,0.2,0.07), omi=c(0.6,0.6,0,0))
+
+# get extent of y-limits
+yext <- c(floor(min(betas-2*betas_se, na.rm=T)/0.5)*0.5,
+          ceiling(max(betas+2*betas_se, na.rm=T)/0.5)*0.5)
+yext <- c(floor(min(betas-2*betas_se, na.rm=T)/0.1)*0.1,
+          ceiling(max(betas+2*betas_se, na.rm=T)/0.1)*0.1)
+
+# draw plots
+for(i in 1:NN) {
+	plot(t_index, betas[,i], type="n",
+		 ylim=yext, xaxt="n", yaxt="n",
+		 xlab="", ylab="", main=names_mat[i,"long"])
+	rect(par()$usr[1], -1, par()$usr[2], 1, col=gray(0.9), border=gray(0.9))
+	abline(h=0, lty="dashed")
+	box()
+	lines(t_index, betas[,i], col=col.pal[i], lwd=2.2)
+	lines(t_index, betas[,i]+2*betas_se[,i], col=col.pal[i], lwd=0.7)
+	lines(t_index, betas[,i]-2*betas_se[,i], col=col.pal[i], lwd=0.7)
+	#text(xin, yin, names.pop[i], adj=c(0,1))	
+	if(i<=nr | nc==1) {
+#		axis(side=2, at=seq(ceiling(yext[1]/2)*2,floor(yext[2]/2)*2), las=1)
+#		axis(side=2, at=seq(yext[1],yext[2])[(seq(yext[1],yext[2])%%1)==0])
+		axis(side=2, las=1, tick=TRUE)
+		}
+	if(i%%nr==0) {
+		axis(side=1, at=t_index[(t_index %% 10)==0])
+		}
+	}
+#mtext("Brood year", side=1, outer=TRUE, line=3, cex=1.2)
+mtext("Year", side=1, outer=TRUE, line=3, cex=1.2)
+mtext(expression(beta[italic(t)]), side=2, outer=TRUE, line=2.2, cex=1.5)
+```
+
+## v2: a unconstrained; b unconstrained
 
 ```{r CAPM_v2, cache=TRUE}
 ## empty list for model results
@@ -456,7 +622,7 @@ colnames(betas4) <- colnames(betas4_se) <- names_pop
 
 ### Plots of results
 
-```{r plot_betas_v2, fig.height=5, fig.width=9}
+```{r plot_betas_v2_1, fig.height=5, fig.width=9}
 betas <- betas[,names_mat$ID]
 
 # total num of ts
@@ -508,9 +674,480 @@ mtext("Year", side=1, outer=TRUE, line=3, cex=1.2)
 mtext(expression(beta[italic(t)]), side=2, outer=TRUE, line=2.2, cex=1.5)
 ```
 
-## v3: fully unconstrained
+## v2: a unconstrained; b equalvarcov
 
-```{r CAPM_v3, cache=TRUE, eval=FALSE}
+```{r CAPM_v2_2, cache=TRUE}
+## empty list for model results
+mod_res <- vector("list", length(mpg_ID))
+## empty beta forecasts
+betas4 <- betas4_se <- NULL
+## empty alphas & betas
+alphas <- alphas_se <- betas <- betas_se <- NULL
+
+## number of regr params = level + slope
+mm <- 2
+
+## CAPMs for each MPG
+for(i in 1:length(mpg_ID)) {
+  
+  ## print loop ID
+  print(paste0("i = ",i,"; MPG = ",mpg_ID[i]))
+  ## get popns
+  assets_mpg <- assets[grep(mpg_ID[i], rownames(assets)),]
+  ## number of assets
+  nn <- dim(assets_mpg)[1]
+  
+  ## Process eqn
+  ## B is Identity
+  BB <- "identity"
+  ## U is col vec of 0's
+  UU <- "zero"
+  ## Q will be block diagonal
+  QQ <- matrix(list(0),mm*nn,mm*nn)
+  ## upper L block for alpha
+  aa <- 1:nn
+  ## equal var-cov
+  # QQ[aa,aa] <- "alpha.cov"
+  # diag(QQ[aa,aa]) <- "alpha.var"
+  ## diagonal & unequal
+  diag(QQ[aa,aa]) <- paste0("alpha",seq(nn))
+  for(j in 1:(nn-1)) {
+    for(k in (j+1):nn) {
+      QQ[j,k] <- paste0("alpha",j,k)
+      QQ[k,j] <- paste0("alpha",j,k)
+    }
+  }
+  ## lower R block for beta
+  bb <- aa + nn
+  ## equal var-cov
+  QQ[bb,bb] <- "beta.cov"
+  diag(QQ[bb,bb]) <- "beta.var"
+  ## diagonal & unequal
+  # diag(QQ[bb,bb]) <- paste0("beta",seq(nn))
+  # for(j in 1:(nn-1)) {
+  #   for(k in (j+1):nn) {
+  #     QQ[j+nn,k+nn] <- paste0("beta",j,k)
+  #     QQ[k+nn,j+nn] <- paste0("beta",j,k)
+  #   }
+  # }
+  
+  ## Observation eqn
+  ## Z is array of regr variables (ie, 1's and market returns)
+  ZZ <- array(NA, c(nn,mm*nn,TT))
+  for(t in 1:TT) {
+    ZZ[,,t] <- cbind(1,market[t]) %x% diag(nn)
+  }
+  ## A is col vec of 0's
+  AA <- "zero"
+  ## assume same obs var & cov
+  ##RR <- matrix(list(0),nn,nn)
+  ##RR[aa,aa] <- "obs.cov"
+  ##diag(RR[aa,aa]) <- "obs.var"
+  RR <- "diagonal and equal"
+  
+  ## starting values for regr parameters
+  ini_list <- list(x0=matrix(1, mm*nn, 1))
+  
+  ## list of model matrices & vectors
+  mod_list <- list(B=BB, U=UU, Q=QQ, Z=ZZ, A=AA, R=RR)
+  ##mod_list <- list(B=BB, U=UU, Q=QQ, Z=ZZ, A=AA, R=RR, x0=x0, V0=V0)
+  
+  ## list of control values
+  con_list <- list(safe=TRUE, allow.degen=FALSE,
+                   conv.test.slope.tol=2, abstol=1e-04, maxit=5e04)
+  
+  ## fit multivariate DLM
+  mod_res[[i]] <- MARSS(assets_mpg, inits=ini_list, model=mod_list, control=con_list)
+  
+  ## get list of Kalman filter output
+  kf_out = MARSSkfss(mod_res[[i]])
+  
+  ## ts of forecasted betas
+  betas4 <- cbind(betas4,t(kf_out$xtt1[(1:nn)+nn,]))
+  
+  ## ts of SE of betas; nxT matrix
+  betas4_se <- cbind(betas4_se,sqrt(t(apply(kf_out$Vtt1,3,diag)[(1:nn)+nn,])))
+  
+  ## ts of alphas
+  alphas <- cbind(alphas,t(mod_res[[i]]$states[1:nn,]))
+  ## ts of SE{alphas}
+  alphas_se <- cbind(alphas_se,t(mod_res[[i]]$states.se[1:nn,]))
+  
+  ## ts of betas
+  betas <- cbind(betas,t(mod_res[[i]]$states[(1:nn)+nn,]))
+  ## ts of SE{betas}
+  betas_se <- cbind(betas_se,t(mod_res[[i]]$states.se[(1:nn)+nn,]))
+  
+}
+
+## assign names
+colnames(alphas) <- colnames(alphas_se) <- names_pop
+colnames(betas) <- colnames(betas_se) <- names_pop
+colnames(betas4) <- colnames(betas4_se) <- names_pop
+```
+
+### Plots of results
+
+```{r plot_betas_v2_2, fig.height=5, fig.width=9}
+betas <- betas[,names_mat$ID]
+
+# total num of ts
+NN <- dim(betas)[2]
+
+# set up colors; group by MPG
+col.pal <- c(rainbow(6, start=0.05, end=0.12),
+             rainbow(3, start=0.2, end=0.45, v=0.7),
+             rainbow(6, start=0.8, end=0.95, v=0.85),
+             rainbow(6, start=0.55, end=0.7))
+
+# num of rows for plot
+nr <- 3
+# num of cols for plot
+nc <- 7
+
+# set graphics params
+par(mfcol=c(nr,nc), mai=c(0.1,0.07,0.2,0.07), omi=c(0.6,0.6,0,0))
+
+# get extent of y-limits
+yext <- c(floor(min(betas-2*betas_se, na.rm=T)/0.5)*0.5,
+          ceiling(max(betas+2*betas_se, na.rm=T)/0.5)*0.5)
+yext <- c(floor(min(betas-2*betas_se, na.rm=T)/0.1)*0.1,
+          ceiling(max(betas+2*betas_se, na.rm=T)/0.1)*0.1)
+
+# draw plots
+for(i in 1:NN) {
+	plot(t_index, betas[,i], type="n",
+		 ylim=yext, xaxt="n", yaxt="n",
+		 xlab="", ylab="", main=names_mat[i,"long"])
+	rect(par()$usr[1], -1, par()$usr[2], 1, col=gray(0.9), border=gray(0.9))
+	abline(h=0, lty="dashed")
+	box()
+	lines(t_index, betas[,i], col=col.pal[i], lwd=2.2)
+	lines(t_index, betas[,i]+2*betas_se[,i], col=col.pal[i], lwd=0.7)
+	lines(t_index, betas[,i]-2*betas_se[,i], col=col.pal[i], lwd=0.7)
+	#text(xin, yin, names.pop[i], adj=c(0,1))	
+	if(i<=nr | nc==1) {
+#		axis(side=2, at=seq(ceiling(yext[1]/2)*2,floor(yext[2]/2)*2), las=1)
+#		axis(side=2, at=seq(yext[1],yext[2])[(seq(yext[1],yext[2])%%1)==0])
+		axis(side=2, las=1, tick=TRUE)
+		}
+	if(i%%nr==0) {
+		axis(side=1, at=t_index[(t_index %% 10)==0])
+		}
+	}
+#mtext("Brood year", side=1, outer=TRUE, line=3, cex=1.2)
+mtext("Year", side=1, outer=TRUE, line=3, cex=1.2)
+mtext(expression(beta[italic(t)]), side=2, outer=TRUE, line=2.2, cex=1.5)
+```
+
+## v3: a equalvarcov; b unconstrained
+
+```{r CAPM_v3_1, cache=TRUE}
+## empty list for model results
+mod_res <- vector("list", length(mpg_ID))
+## empty beta forecasts
+betas4 <- betas4_se <- NULL
+## empty alphas & betas
+alphas <- alphas_se <- betas <- betas_se <- NULL
+
+## number of regr params = level + slope
+mm <- 2
+
+## CAPMs for each MPG
+for(i in 1:length(mpg_ID)) {
+  
+  ## print loop ID
+  print(paste0("i = ",i,"; MPG = ",mpg_ID[i]))
+  ## get popns
+  assets_mpg <- assets[grep(mpg_ID[i], rownames(assets)),]
+  ## number of assets
+  nn <- dim(assets_mpg)[1]
+  
+  ## Process eqn
+  ## B is Identity
+  BB <- "identity"
+  ## U is col vec of 0's
+  UU <- "zero"
+  ## Q will be block diagonal
+  QQ <- matrix(list(0),mm*nn,mm*nn)
+  ## upper L block for alpha
+  aa <- 1:nn
+  ## equal var-cov
+  QQ[aa,aa] <- "alpha.cov"
+  diag(QQ[aa,aa]) <- "alpha.var"
+  ## lower R block for beta
+  bb <- aa + nn
+  ## diagonal & unequal
+  diag(QQ[bb,bb]) <- paste0("beta",seq(nn))
+  for(j in 1:(nn-1)) {
+    for(k in (j+1):nn) {
+      QQ[j+nn,k+nn] <- paste0("beta",j,k)
+      QQ[k+nn,j+nn] <- paste0("beta",j,k)
+    }
+  }
+  
+  ## Observation eqn
+  ## Z is array of regr variables (ie, 1's and market returns)
+  ZZ <- array(NA, c(nn,mm*nn,TT))
+  for(t in 1:TT) {
+    ZZ[,,t] <- cbind(1,market[t]) %x% diag(nn)
+  }
+  ## A is col vec of 0's
+  AA <- "zero"
+  ## assume same obs var & cov
+  ##RR <- matrix(list(0),nn,nn)
+  ##RR[aa,aa] <- "obs.cov"
+  ##diag(RR[aa,aa]) <- "obs.var"
+  RR <- "diagonal and equal"
+  
+  ## starting values for regr parameters
+  ini_list <- list(x0=matrix(1, mm*nn, 1))
+  
+  ## list of model matrices & vectors
+  mod_list <- list(B=BB, U=UU, Q=QQ, Z=ZZ, A=AA, R=RR)
+  ##mod_list <- list(B=BB, U=UU, Q=QQ, Z=ZZ, A=AA, R=RR, x0=x0, V0=V0)
+  
+  ## list of control values
+  con_list <- list(safe=TRUE, allow.degen=FALSE,
+                   conv.test.slope.tol=2, abstol=1e-04, maxit=5e04)
+  
+  ## fit multivariate DLM
+  mod_res[[i]] <- MARSS(assets_mpg, inits=ini_list, model=mod_list, control=con_list)
+  
+  ## get list of Kalman filter output
+  kf_out = MARSSkfss(mod_res[[i]])
+  
+  ## ts of forecasted betas
+  betas4 <- cbind(betas4,t(kf_out$xtt1[(1:nn)+nn,]))
+  
+  ## ts of SE of betas; nxT matrix
+  betas4_se <- cbind(betas4_se,sqrt(t(apply(kf_out$Vtt1,3,diag)[(1:nn)+nn,])))
+  
+  ## ts of alphas
+  alphas <- cbind(alphas,t(mod_res[[i]]$states[1:nn,]))
+  ## ts of SE{alphas}
+  alphas_se <- cbind(alphas_se,t(mod_res[[i]]$states.se[1:nn,]))
+  
+  ## ts of betas
+  betas <- cbind(betas,t(mod_res[[i]]$states[(1:nn)+nn,]))
+  ## ts of SE{betas}
+  betas_se <- cbind(betas_se,t(mod_res[[i]]$states.se[(1:nn)+nn,]))
+  
+}
+
+## assign names
+colnames(alphas) <- colnames(alphas_se) <- names_pop
+colnames(betas) <- colnames(betas_se) <- names_pop
+colnames(betas4) <- colnames(betas4_se) <- names_pop
+```
+
+### Plots of results
+
+```{r plot_betas_v3_1, fig.height=5, fig.width=9}
+betas <- betas[,names_mat$ID]
+
+# total num of ts
+NN <- dim(betas)[2]
+
+# set up colors; group by MPG
+col.pal <- c(rainbow(6, start=0.05, end=0.12),
+			 rainbow(3, start=0.2, end=0.45, v=0.7),
+			 rainbow(6, start=0.8, end=0.95, v=0.85),
+			 rainbow(6, start=0.55, end=0.7))
+
+# num of rows for plot
+nr <- 3
+# num of cols for plot
+nc <- 7
+
+# set graphics params
+par(mfcol=c(nr,nc), mai=c(0.1,0.07,0.2,0.07), omi=c(0.6,0.6,0,0))
+
+# get extent of y-limits
+yext <- c(floor(min(betas-2*betas_se, na.rm=T)/0.5)*0.5,
+          ceiling(max(betas+2*betas_se, na.rm=T)/0.5)*0.5)
+yext <- c(floor(min(betas-2*betas_se, na.rm=T)/0.1)*0.1,
+          ceiling(max(betas+2*betas_se, na.rm=T)/0.1)*0.1)
+
+# draw plots
+for(i in 1:NN) {
+	plot(t_index, betas[,i], type="n",
+		 ylim=yext, xaxt="n", yaxt="n",
+		 xlab="", ylab="", main=names_mat[i,"long"])
+	rect(par()$usr[1], -1, par()$usr[2], 1, col=gray(0.9), border=gray(0.9))
+	abline(h=0, lty="dashed")
+	box()
+	lines(t_index, betas[,i], col=col.pal[i], lwd=2.2)
+	lines(t_index, betas[,i]+2*betas_se[,i], col=col.pal[i], lwd=0.7)
+	lines(t_index, betas[,i]-2*betas_se[,i], col=col.pal[i], lwd=0.7)
+	#text(xin, yin, names.pop[i], adj=c(0,1))	
+	if(i<=nr | nc==1) {
+#		axis(side=2, at=seq(ceiling(yext[1]/2)*2,floor(yext[2]/2)*2), las=1)
+#		axis(side=2, at=seq(yext[1],yext[2])[(seq(yext[1],yext[2])%%1)==0])
+		axis(side=2, las=1, tick=TRUE)
+		}
+	if(i%%nr==0) {
+		axis(side=1, at=t_index[(t_index %% 10)==0])
+		}
+	}
+#mtext("Brood year", side=1, outer=TRUE, line=3, cex=1.2)
+mtext("Year", side=1, outer=TRUE, line=3, cex=1.2)
+mtext(expression(beta[italic(t)]), side=2, outer=TRUE, line=2.2, cex=1.5)
+```
+
+## v3: a equalvarcov; b equalvarcov
+
+```{r CAPM_v3_2, cache=TRUE}
+## empty list for model results
+mod_res <- vector("list", length(mpg_ID))
+## empty beta forecasts
+betas4 <- betas4_se <- NULL
+## empty alphas & betas
+alphas <- alphas_se <- betas <- betas_se <- NULL
+
+## number of regr params = level + slope
+mm <- 2
+
+## CAPMs for each MPG
+for(i in 1:length(mpg_ID)) {
+  
+  ## print loop ID
+  print(paste0("i = ",i,"; MPG = ",mpg_ID[i]))
+  ## get popns
+  assets_mpg <- assets[grep(mpg_ID[i], rownames(assets)),]
+  ## number of assets
+  nn <- dim(assets_mpg)[1]
+  
+  ## Process eqn
+  ## B is Identity
+  BB <- "identity"
+  ## U is col vec of 0's
+  UU <- "zero"
+  ## Q will be block diagonal
+  QQ <- matrix(list(0),mm*nn,mm*nn)
+  ## upper L block for alpha
+  aa <- 1:nn
+  ## equal var-cov
+  QQ[aa,aa] <- "alpha.cov"
+  diag(QQ[aa,aa]) <- "alpha.var"
+  ## lower R block for beta
+  bb <- aa + nn
+  ## equal var-cov
+  QQ[bb,bb] <- "beta.cov"
+  diag(QQ[bb,bb]) <- "beta.var"
+
+  ## Observation eqn
+  ## Z is array of regr variables (ie, 1's and market returns)
+  ZZ <- array(NA, c(nn,mm*nn,TT))
+  for(t in 1:TT) {
+    ZZ[,,t] <- cbind(1,market[t]) %x% diag(nn)
+  }
+  ## A is col vec of 0's
+  AA <- "zero"
+  ## assume same obs var & cov
+  ##RR <- matrix(list(0),nn,nn)
+  ##RR[aa,aa] <- "obs.cov"
+  ##diag(RR[aa,aa]) <- "obs.var"
+  RR <- "diagonal and equal"
+  
+  ## starting values for regr parameters
+  ini_list <- list(x0=matrix(1, mm*nn, 1))
+  
+  ## list of model matrices & vectors
+  mod_list <- list(B=BB, U=UU, Q=QQ, Z=ZZ, A=AA, R=RR)
+  ##mod_list <- list(B=BB, U=UU, Q=QQ, Z=ZZ, A=AA, R=RR, x0=x0, V0=V0)
+  
+  ## list of control values
+  con_list <- list(safe=TRUE, allow.degen=FALSE,
+                   conv.test.slope.tol=2, abstol=1e-04, maxit=5e04)
+  
+  ## fit multivariate DLM
+  mod_res[[i]] <- MARSS(assets_mpg, inits=ini_list, model=mod_list, control=con_list)
+  
+  ## get list of Kalman filter output
+  kf_out = MARSSkfss(mod_res[[i]])
+  
+  ## ts of forecasted betas
+  betas4 <- cbind(betas4,t(kf_out$xtt1[(1:nn)+nn,]))
+  
+  ## ts of SE of betas; nxT matrix
+  betas4_se <- cbind(betas4_se,sqrt(t(apply(kf_out$Vtt1,3,diag)[(1:nn)+nn,])))
+  
+  ## ts of alphas
+  alphas <- cbind(alphas,t(mod_res[[i]]$states[1:nn,]))
+  ## ts of SE{alphas}
+  alphas_se <- cbind(alphas_se,t(mod_res[[i]]$states.se[1:nn,]))
+  
+  ## ts of betas
+  betas <- cbind(betas,t(mod_res[[i]]$states[(1:nn)+nn,]))
+  ## ts of SE{betas}
+  betas_se <- cbind(betas_se,t(mod_res[[i]]$states.se[(1:nn)+nn,]))
+  
+}
+
+## assign names
+colnames(alphas) <- colnames(alphas_se) <- names_pop
+colnames(betas) <- colnames(betas_se) <- names_pop
+colnames(betas4) <- colnames(betas4_se) <- names_pop
+```
+
+### Plots of results
+
+```{r plot_betas_v3_2, fig.height=5, fig.width=9}
+betas <- betas[,names_mat$ID]
+
+# total num of ts
+NN <- dim(betas)[2]
+
+# set up colors; group by MPG
+col.pal <- c(rainbow(6, start=0.05, end=0.12),
+             rainbow(3, start=0.2, end=0.45, v=0.7),
+             rainbow(6, start=0.8, end=0.95, v=0.85),
+             rainbow(6, start=0.55, end=0.7))
+
+# num of rows for plot
+nr <- 3
+# num of cols for plot
+nc <- 7
+
+# set graphics params
+par(mfcol=c(nr,nc), mai=c(0.1,0.07,0.2,0.07), omi=c(0.6,0.6,0,0))
+
+# get extent of y-limits
+yext <- c(floor(min(betas-2*betas_se, na.rm=T)/0.5)*0.5,
+          ceiling(max(betas+2*betas_se, na.rm=T)/0.5)*0.5)
+yext <- c(floor(min(betas-2*betas_se, na.rm=T)/0.1)*0.1,
+          ceiling(max(betas+2*betas_se, na.rm=T)/0.1)*0.1)
+
+# draw plots
+for(i in 1:NN) {
+	plot(t_index, betas[,i], type="n",
+		 ylim=yext, xaxt="n", yaxt="n",
+		 xlab="", ylab="", main=names_mat[i,"long"])
+	rect(par()$usr[1], -1, par()$usr[2], 1, col=gray(0.9), border=gray(0.9))
+	abline(h=0, lty="dashed")
+	box()
+	lines(t_index, betas[,i], col=col.pal[i], lwd=2.2)
+	lines(t_index, betas[,i]+2*betas_se[,i], col=col.pal[i], lwd=0.7)
+	lines(t_index, betas[,i]-2*betas_se[,i], col=col.pal[i], lwd=0.7)
+	#text(xin, yin, names.pop[i], adj=c(0,1))	
+	if(i<=nr | nc==1) {
+#		axis(side=2, at=seq(ceiling(yext[1]/2)*2,floor(yext[2]/2)*2), las=1)
+#		axis(side=2, at=seq(yext[1],yext[2])[(seq(yext[1],yext[2])%%1)==0])
+		axis(side=2, las=1, tick=TRUE)
+		}
+	if(i%%nr==0) {
+		axis(side=1, at=t_index[(t_index %% 10)==0])
+		}
+	}
+#mtext("Brood year", side=1, outer=TRUE, line=3, cex=1.2)
+mtext("Year", side=1, outer=TRUE, line=3, cex=1.2)
+mtext(expression(beta[italic(t)]), side=2, outer=TRUE, line=2.2, cex=1.5)
+```
+
+## v4: fully unconstrained
+
+```{r CAPM_v4, cache=TRUE, eval=FALSE}
 ## empty list for model results
 mod_res <- vector("list", length(mpg_ID))
 ## empty beta forecasts
@@ -604,7 +1241,7 @@ colnames(betas4) <- colnames(betas4_se) <- names_pop
 
 ### Plots of results
 
-```{r plot_betas_v3, fig.height=5, fig.width=9, eval=FALSE}
+```{r plot_betas_v4_1, fig.height=5, fig.width=9, eval=FALSE}
 betas <- betas[,names_mat$ID]
 
 # total num of ts
