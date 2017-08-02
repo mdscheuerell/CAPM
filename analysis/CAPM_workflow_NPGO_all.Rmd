@@ -244,10 +244,10 @@ con_list <- list(safe=TRUE, allow.degen=FALSE,
                  conv.test.slope.tol=2, abstol=1e-04, maxit=5e04)
 
 ## fit multivariate DLM
-mod_res[[i]] <- MARSS(assets, inits=ini_list, model=mod_list, control=con_list)
+mod_res <- MARSS(assets, inits=ini_list, model=mod_list, control=con_list)
 
 ## get list of Kalman filter output
-kf_out <- MARSSkfss(mod_res[[i]])
+kf_out <- MARSSkfss(mod_res)
 
 ## ts of forecasted betas
 betas4 <- t(kf_out$xtt1[(1:nn)+nn,])
@@ -256,14 +256,14 @@ betas4 <- t(kf_out$xtt1[(1:nn)+nn,])
 betas4_se <- sqrt(t(apply(kf_out$Vtt1,3,diag)[(1:nn)+nn,]))
 
 ## ts of alphas
-alphas <- t(mod_res[[i]]$states[1:nn,])
+alphas <- t(mod_res$states[1:nn,])
 ## ts of SE{alphas}
-alphas_se <- t(mod_res[[i]]$states.se[1:nn,])
+alphas_se <- t(mod_res$states.se[1:nn,])
 
 ## ts of betas
-betas <- t(mod_res[[i]]$states[(1:nn)+nn,])
+betas <- t(mod_res$states[(1:nn)+nn,])
 ## ts of SE{betas}
-betas_se <- t(mod_res[[i]]$states.se[(1:nn)+nn,])
+betas_se <- t(mod_res$states.se[(1:nn)+nn,])
 
 ## assign names
 colnames(alphas) <- colnames(alphas_se) <- names_pop
